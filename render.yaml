@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: kharidyar
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /api/test
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: DATABASE_URL
+        sync: false
+      - key: FLASK_SECRET_KEY
+        generateValue: true

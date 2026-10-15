@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#050914">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>خریدیار | فهرست خرید خانوادگی</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/script.js" defer></script>
+</head>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/service-worker.js")
+        .catch(error => console.error("خطا در ثبت Service Worker:", error));
+    });
+  }
+</script>
+<body>
+  <header class="header">
+    <a href="#home" class="logo">◆ خریدیار</a>
+
+    <nav class="nav">
+      <a class="nav-link" href="#home">خانه</a>
+      <a class="nav-link" href="#features">امکانات</a>
+      <a class="nav-link" href="#about">دربارهٔ ما</a>
+    </nav>
+
+    <div class="header-actions">
+      <a href="#start" class="header-button">شروع کنید</a>
+
+      <div class="profile-menu" hidden>
+        <button class="profile-menu-button" type="button" aria-expanded="false">
+          پروفایل <span>⌄</span>
+        </button>
+
+        <div class="profile-dropdown" hidden>
+          <button type="button" data-profile-action="settings">تنظیمات</button>
+          <button type="button" data-profile-action="change-password">تغییر رمز عبور</button>
+          <button type="button" data-profile-action="logout">خروج از حساب</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-content">
+        <span class="eyebrow">خرید خانوادگی، ساده‌تر از همیشه</span>
+        <h1>همهٔ خریدها،<br><span>یک‌جا و هماهنگ</span></h1>
+        <p>
+          فهرست خرید خانواده‌تان را بسازید، کالاها را مدیریت کنید
+          و با کمک اعضای خانواده خریدها را هماهنگ پیش ببرید.
+        </p>
+
+        <div class="hero-actions" id="start">
+          <button class="button primary" id="create-family">ساخت خانواده</button>
+          <button class="button secondary" id="join-family">ورود به خانواده</button>
+        </div>
+      </div>
+
+      <div class="hero-art" aria-hidden="true">
+        <div class="art-card">
+          <span class="art-check">✓</span>
+          <div>
+            <b>فهرست خرید</b>
+            <small>همه‌چیز مرتب و آماده</small>
+          </div>
+          <span class="art-bag">🛍</span>
+        </div>
+
+        <div class="art-mini">✓ نان تازه <span>۲ عدد</span></div>
+        <div class="art-mini">✓ شیر <span>۱ عدد</span></div>
+        <div class="art-mini">○ میوه <span>به انتخاب خانواده</span></div>
+      </div>
+    </section>
+
+    <section class="features section" id="features">
+      <span class="eyebrow">امکانات</span>
+      <h2>برای خریدهای روزمره</h2>
+
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span>👨‍👩‍👧‍👦</span>
+          <h3>خانوادگی</h3>
+          <p>اعضای خانواده در یک فضای مشترک همکاری می‌کنند.</p>
+        </article>
+
+        <article class="feature-card">
+          <span>🛒</span>
+          <h3>فهرست خرید</h3>
+          <p>کالاها و تعداد موردنیاز را در یک فهرست نگه دارید.</p>
+        </article>
+
+        <article class="feature-card">
+          <span>✓</span>
+          <h3>تأیید درخواست‌ها</h3>
+          <p>اعضای تعیین‌شده می‌توانند درخواست‌ها را بررسی کنند.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="about-section section" id="about">
+      <span class="eyebrow">دربارهٔ خریدیار</span>
+      <h2>خرید هماهنگ، بدون سردرگمی</h2>
+      <p>خریدیار کمک می‌کند فهرست خرید خانواده‌تان همیشه در دسترس و مرتب باشد.</p>
+    </section>
+  </main>
+
+  <footer class="footer">خریدیار · فهرست خرید خانوادگی</footer>
+
+  <section id="family-app" dir="rtl" aria-label="فضای خانواده">
+    <header class="family-topbar">
+      <a href="#home" class="logo">◆ خریدیار</a>
+
+      <div class="family-title">
+        <h2 id="family-page-name">خانوادهٔ من</h2>
+        <p id="family-page-member"></p>
+      </div>
+
+      <div class="profile-menu" hidden>
+        <button class="profile-menu-button" type="button" aria-expanded="false">
+          پروفایل <span>⌄</span>
+        </button>
+
+        <div class="profile-dropdown" hidden>
+          <button type="button" data-profile-action="settings">تنظیمات</button>
+          <button type="button" data-profile-action="change-password">تغییر رمز عبور</button>
+          <button type="button" data-profile-action="logout">خروج از حساب</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="family-layout">
+      <aside class="family-sidebar">
+        <button class="family-nav active" data-page="shopping">🛒 فهرست خرید</button>
+        <button class="family-nav" data-page="products">📦 افزودن کالا</button>
+        <button class="family-nav" data-page="members">👥 اعضای خانواده</button>
+        <button class="family-nav" data-page="requests">✓ درخواست‌ها</button>
+        <button class="family-nav" data-page="exit">بازگشت به خانه</button>
+      </aside>
+
+      <main class="family-workspace">
+        <div id="family-page-content"></div>
+      </main>
+    </div>
+
+    <nav class="family-bottom-nav">
+      <button class="family-nav active" data-page="shopping">🛒<span>خرید</span></button>
+      <button class="family-nav" data-page="products">📦<span>افزودن کالا</span></button>
+      <button class="family-nav" data-page="members">👥<span>اعضا</span></button>
+      <button class="family-nav" data-page="requests">✓<span>درخواست‌ها</span></button>
+    </nav>
+  </section>
+
+  <div id="modal-overlay" hidden>
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button id="close-modal" class="modal-close" type="button" aria-label="بستن">×</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <div id="message-box" role="status" aria-live="polite"></div>
+</body>
+</html>
