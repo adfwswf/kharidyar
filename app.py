@@ -4,6 +4,15 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except ImportError:  # Allows local SQLite use before PostgreSQL dependencies are installed.
+    psycopg2 = None
+    RealDictCursor = None
+
+POSTGRES_ERRORS = (psycopg2.Error,) if psycopg2 else ()
+POSTGRES_INTEGRITY_ERRORS = (psycopg2.IntegrityError,) if psycopg2 else ()
 import secrets
 import re
 import os
@@ -24,7 +33,7 @@ else:
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_SECURE=bool(os.environ.get("DATABASE_URL")),
     MAX_CONTENT_LENGTH=5 * 1024 * 1024,
 )
 
@@ -36,11 +45,89 @@ TOKEN_MAX_AGE = 30 * 24 * 60 * 60
 # اتصال به پایگاه داده
 # =========================================================
 
+class DatabaseCursor:
+    """Small compatibility wrapper so the existing SQLite-style routes also work on PostgreSQL."""
+    def __init__(self, cursor, lastrowid=None):
+        self._cursor = cursor
+        self.lastrowid = lastrowid
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+    def fetchall(self):
+        return self._cursor.fetchall()
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+
+class DatabaseConnection:
+    def __init__(self, connection, postgres=False):
+        self.connection = connection
+        self.postgres = postgres
+
+    def _sql(self, sql):
+        if not self.postgres:
+            return sql
+        # Translate SQLite placeholders and case-insensitive comparisons.
+        sql = sql.replace('name = ? COLLATE NOCASE', 'LOWER(name) = LOWER(?)')
+        sql = re.sub(r'([A-Za-z_][A-Za-z0-9_.]*)\s+COLLATE\s+NOCASE', r'LOWER(\1)', sql, flags=re.I)
+        sql = sql.replace('?', '%s')
+        sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'BIGSERIAL PRIMARY KEY')
+        return sql
+
+    def execute(self, sql, params=()):
+        if not self.postgres:
+            cursor = self.connection.execute(sql, params)
+            return DatabaseCursor(cursor, getattr(cursor, 'lastrowid', None))
+
+        prepared = self._sql(sql)
+        is_insert = bool(re.match(r'\s*INSERT\s+INTO\s+', prepared, flags=re.I))
+        has_returning = bool(re.search(r'\bRETURNING\b', prepared, flags=re.I))
+        cursor = self.connection.cursor(cursor_factory=RealDictCursor)
+        if is_insert and not has_returning:
+            prepared = prepared.rstrip().rstrip(';') + ' RETURNING id'
+        cursor.execute(prepared, params)
+        inserted_id = None
+        if is_insert and not has_returning:
+            row = cursor.fetchone()
+            if row:
+                inserted_id = row.get('id')
+        return DatabaseCursor(cursor, inserted_id)
+
+    def executescript(self, script):
+        if not self.postgres:
+            self.connection.executescript(script)
+            return
+        # The initialization script contains ordinary DDL statements separated by semicolons.
+        for statement in script.split(';'):
+            statement = statement.strip()
+            if statement:
+                self.execute(statement)
+
+    def commit(self):
+        self.connection.commit()
+
+    def rollback(self):
+        self.connection.rollback()
+
+    def close(self):
+        self.connection.close()
+
+
 @contextmanager
 def get_db():
-    db = sqlite3.connect(DB_PATH, timeout=10)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys = ON")
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if database_url:
+        if psycopg2 is None:
+            raise RuntimeError("برای اتصال به PostgreSQL باید psycopg2-binary نصب باشد.")
+        raw_db = psycopg2.connect(database_url, connect_timeout=15)
+        db = DatabaseConnection(raw_db, postgres=True)
+    else:
+        raw_db = sqlite3.connect(DB_PATH, timeout=10)
+        raw_db.row_factory = sqlite3.Row
+        raw_db.execute("PRAGMA foreign_keys = ON")
+        db = DatabaseConnection(raw_db, postgres=False)
 
     try:
         yield db
@@ -60,12 +147,15 @@ def error(message, status=400):
 
 
 def table_columns(db, table_name):
-    return {
-        row["name"]
-        for row in db.execute(
-            f"PRAGMA table_info({table_name})"
+    if db.postgres:
+        rows = db.execute(
+            "SELECT column_name AS name FROM information_schema.columns "
+            "WHERE table_schema = 'public' AND table_name = ?",
+            (table_name,),
         ).fetchall()
-    }
+    else:
+        rows = db.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {row["name"] for row in rows}
 
 
 # =========================================================
@@ -573,7 +663,7 @@ def create_family():
                 "members": created_members,
             }), 201
 
-    except sqlite3.Error:
+    except (sqlite3.Error,) + POSTGRES_ERRORS:
         app.logger.exception("خطا در ساخت خانواده")
         return error(
             "ساخت خانواده انجام نشد. دوباره تلاش کنید.",
@@ -676,13 +766,13 @@ def activate_account():
                 "tabToken": create_tab_token(updated["id"]),
             })
 
-    except sqlite3.IntegrityError:
+    except (sqlite3.IntegrityError,) + POSTGRES_INTEGRITY_ERRORS:
         return error(
             "این نام کاربری قبلاً استفاده شده است.",
             409,
         )
 
-    except sqlite3.Error:
+    except (sqlite3.Error,) + POSTGRES_ERRORS:
         app.logger.exception("خطا در فعال‌سازی حساب")
         return error("فعال‌سازی حساب انجام نشد.", 500)
 
@@ -870,10 +960,6 @@ def change_password():
 # کالاهای خانواده
 # =========================================================
 
-@app.route(
-    "/api/families/<int:family_id>/products",
-    methods=["GET", "POST"],
-)
 @app.route(
     "/api/families/<int:family_id>/products",
     methods=["GET", "POST"],
